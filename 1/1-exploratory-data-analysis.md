@@ -271,7 +271,7 @@ plt.hist(df['Steps'], normed=True, alpha = 0.5)
 
 
 
-![png](output_25_1.png)
+![png](pics/output_25_1.png)
 
 
 
@@ -288,7 +288,7 @@ sns.distplot(df['Steps'], hist=True, kde=False, bins=50)
 
 
 
-![png](output_26_1.png)
+![png](pics/output_26_1.png)
 
 
 ### b) oops
@@ -306,7 +306,7 @@ sns.boxplot(x=df['Sleep'])
 
 
 
-![png](output_28_1.png)
+![png](pics/output_28_1.png)
 
 
 ### c) Plot a scatterplot of the hours of sleep vs. the number of steps overall. Does there appear to be any pattern in this plot? Explain.
@@ -319,7 +319,7 @@ ggplot(df, aes(x='Sleep', y='Steps'))\
 ```
 
 
-![png](output_30_0.png)
+![png](pics/output_30_0.png)
 
 
 
@@ -348,7 +348,7 @@ sns.barplot(x='Day', y='day_freq', palette='Blues_d', data=df_freq_days)
 
 
 
-![png](output_32_1.png)
+![png](pics/output_32_1.png)
 
 
 ## Question 4
@@ -368,7 +368,7 @@ sns.boxplot(x='Day', y='Steps', data=df)
 
 
 
-![png](output_35_1.png)
+![png](pics/output_35_1.png)
 
 
 ### b) Plot a grouped boxplot of sleep by the month of the year. Which month had the largest spread (if any)?
@@ -386,7 +386,7 @@ sns.boxplot(x='Month', y='Sleep', data=df)
 
 
 
-![png](output_37_1.png)
+![png](pics/output_37_1.png)
 
 
 ### c) Plot a grouped boxplot of active hours by day. Are there a group of days that appear to be more active? If so, which ones?
@@ -404,7 +404,7 @@ sns.boxplot(x='Day', y='Active', data=df)
 
 
 
-![png](output_39_1.png)
+![png](pics/output_39_1.png)
 
 
 ### d) Plot a grouped histogram of “low activity” by day. Which day has the lowest “low activity” hours?
@@ -431,7 +431,7 @@ df['Sed'].hist(by=df['Day'])
 
 
 
-![png](output_41_1.png)
+![png](pics/output_41_1.png)
 
 
 
@@ -467,5 +467,5 @@ g = g.map(plt.hist, 'Sed', bins=np.arange(min(df['Sed']),max(df['Sed']) + 0.5, 0
 ```
 
 
-![png](output_43_0.png)
+![png](pics/output_43_0.png)
 
