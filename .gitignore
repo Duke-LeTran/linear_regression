@@ -1,3 +1,5 @@
 # gitignore
 *.pdf
-*/
+*datasets/
+#hw-questions/
+*.ipynb_checkpoints/
