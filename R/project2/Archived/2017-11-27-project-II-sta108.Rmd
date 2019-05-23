@@ -1,0 +1,550 @@
+---
+title: "Statistical Analysis of Housing Prices and Square Footage in King county, Washington"
+author: "Duke LeTran"
+date: "October 27th, 2017"
+output: html_document
+---
+
+```{r, echo = FALSE}
+# Initialize - Read, Library
+k <- read.csv("C:/Users/dletran/Dropbox/Documents/108 - STA, linear regression/Projects/project1/KingCounty.csv") 
+library(ggplot2)
+library(gridExtra)
+
+```
+# I. Introduction
+
+```{r, echo = FALSE}
+###### I. Introduction
+n = nrow(k)
+k_col = names(k)
+
+```
+
+This report aims to analyze the dataset "KingCounty.csv" (n = `r n`) which consists of randomly sampled houses in King County, Washington. Square footage of living space (X = `r k_col[2]`) is our explantory random variable, and price in dollars (Y = `r k_col[1]`) is our response random variable. 
+
+The question we are trying to answer:
+
+    Are we able to predict the selling price of a house based on the square footage?
+
+The approach we intend to take is attempt to fit our data to the model:
+
+    Simple Linear Regression
+
+Let's first begin with some exploratory data analysis.
+
+# II. Summary of Data
+
+### Scatterplot - King County, Washington
+
+``` {r, echo=FALSE}
+###### II. Summary of Data
+# Scatterplots
+ggplot(k, aes(x = sqft_living, y = price)) +
+  geom_smooth(method='lm', se = FALSE, color = "purple", size = 0.4) +
+  geom_point(size=1, shape=18) +
+  ggtitle("Home Prices vs. Square Footage") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  ylab("Price (US dollars)") +
+  xlab("Square Footage")
+```
+
+### Boxplot and Histograms - King County, Washington
+
+```{r, echo = FALSE}
+# Boxplots
+b_sqft <- ggplot(k,
+       aes(y = sqft_living, x = factor(""))) +
+  geom_boxplot(fill = "white", colour = "#3366FF", outlier.color = "red", outlier.shape = 1) +
+  ylab("sqft_living") +
+  xlab(" ") +
+  coord_flip() + #flips it from vertical to sideways plots
+  ggtitle("X: Square Footage") +
+  theme(plot.title = element_text(hjust = 0.5)) +#centers the title
+  stat_boxplot(geom ='errorbar')
+b_price <- ggplot(k,
+       aes(y = price, x = factor(""))) +
+  geom_boxplot(fill = "white", colour = "#3366FF", outlier.color = "red", outlier.shape = 1) +
+  ylab("price") +
+  xlab(" ") +
+  coord_flip() + #flips it from vertical to sideways plots
+  ggtitle("Y: House Prices") +
+  theme(plot.title = element_text(hjust = 0.5)) +#centers the title
+  stat_boxplot(geom ='errorbar')
+# Histograms
+h_price <- ggplot(k,
+       aes(x = price)) + 
+  geom_histogram(binwidth = 80000, color = "black",fill = "white") + 
+  xlab("price") + 
+  ggtitle("Y: House Prices") +
+  theme(plot.title = element_text(hjust = 0.5))
+h_sqft <- ggplot(k,
+       aes(x = sqft_living)) + 
+  geom_histogram(binwidth = 150, color = "black",fill = "white") + 
+  xlab("X: sqft_living") + 
+  ggtitle("Square Footage") +
+  theme(plot.title = element_text(hjust = 0.5))
+# mutiplot
+grid.arrange(b_price, h_price, b_sqft, h_sqft, ncol=2)
+```
+
+
+
+```{r, echo=FALSE}
+# Summary of Data
+summary(k)
+k_var_price = var(k$price)
+k_var_sqft = var(k$sqft_living)
+k_std_price = sd(k$price)
+k_std_sqft = sd(k$sqft_living)
+
+```
+#### House Prices (Y)
+* Sample Mean: $566,594.00
+* Sample Median: $460,000.00
+* Sample Standard Deviation: $434,558.60
+
+#### Square Footage (X)
+* Sample Mean: 2,115
+* Sample Median: 1,940
+* Sample Standard Deviation: 976.97
+
+We see very clearly that this dataset is right-skewed for both random variables X and Y (as defined in the introduction). This is demonstrated in the boxplots by the outliers concentrated on the right and in the histograms by a right tail. This is further exemplefied by comparing the mean and the median, of which the mean is greater than the median for both random variables. 
+
+# IIIa. Diagnostics - Initial Model
+
+```{r, echo=FALSE}
+###### IIIa. Diagnostics - Initial Model
+#simple linear model
+k_model = lm(price ~ sqft_living, data=k)
+#initialize for diagnostics
+k.sum = summary(k_model)
+k.HT = k.sum$coefficients
+k.b1 = round(k.HT[2,1], 2)
+k.b0 = round(k.HT[1,1], 2)
+k.sb1 = round(k.HT[2,2], 2)
+k$ei = k_model$residuals
+k$yhat = k_model$fitted.values
+#quick check to see if there a significant linear relationship for b1
+####confidence intervals
+k.CI = confint(k_model, level = 0.99)
+k.CI.b1 = k.CI[2,]
+```
+
+Based on our raw data, this is our estimated regression line:
+
+$Y = -120,325.50 + `r k.b1`X$
+
+We are 99% confident that that when our square footage (X) changes by 1 unit, the estimated change of housing prices (Y) increases between `r k.CI.b1[1]` and `r k.CI.b1[2]`, on average. Since zero is not included in the confidence interval of $b_1$ and is strictly positive, a statistically significant positive relationship is suggested between housing prices(Y) and square footage(X). 
+
+Since there is a statistically significant positive relationship suggested, let's continue to examine if our data violates any of the following assumptions:
+
+* Homoscedasticity (constant variance)
+
+* Normality
+
+
+### ASSESSING HOMOSCEDASTICITY 
+
+#### I. Distribution of Errors
+
+```{r, echo=FALSE}
+##ASSESSING HOMOSCEDASITICITY
+#i.Distribution of Errors
+ggplot(k, 
+       aes(x = yhat, y = ei)) +
+  geom_smooth(method='lm', se = FALSE, color = "green", size = 0.4) +
+  geom_point(size=1, shape=18) +
+  ggtitle("Errors vs. Fitted Values") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  ylab("Errors") +
+  xlab("Fitted Values")
+```
+
+#### II. Fligner Killeen (FK) test
+
+$H_0: \sigma_l ^2 = \sigma_u ^2$
+
+$H_0: \sigma_l ^2 \neq \sigma_u ^2$
+
+```{r, echo=FALSE}
+#ii.Fligner Killeen Test
+Group = rep("Lower",nrow(k))
+Group[k$price > median(k$price)] = "Upper"
+Group = as.factor(Group)
+k$Group = Group
+k.FKtest = fligner.test(k$ei, k$Group)
+k.FKtest
+```
+
+
+### ASSESSING NORMALITY
+
+#### I. Histogram of $e_i$
+```{r, echo=FALSE}
+##ASSESSING NORMALITY
+#i.histogram of ei
+ggplot(k,
+       aes(x = ei)) + 
+  geom_histogram(binwidth = 100000, color = "black",fill = "white") + 
+  xlab("ei") + 
+  ggtitle("Residuals") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+#### II. QQ Plot
+```{r, echo=FALSE}
+#ii. qqplot
+qqnorm(k_model$residuals)
+qqline(k_model$residuals)
+```
+
+#### III. Shapiro-Wilks Test
+
+$H_0:$ The errors are normally distributed
+
+$H_A:$ The errors are NOT normally distributed
+```{r, echo=FALSE}
+#iii. shapiro-wilks test
+k.ei = k_model$residuals
+k.SWtest = shapiro.test(k.ei)
+k.SWtest
+
+```
+
+
+
+###DISCUSSION - Diagnositics
+
+*Assessing Homoscedasticity*
+
+The scatterplot of errors versus fitted values clearly shows an ergregious violation of constant variance -- a distribution shape of a cone. Furthermore, our Fligner-Killeen test has rejected  null hypothesis for all $\alpha = 0.10, 0.05, 0.1 $, which means we accept the alternative hypothesis that our variance of our lower half of the data does not equal the variance of our upper group of data.
+
+* Scatterplot of Errors vs. Fitted Values: **FAIL**
+
+* FK Test: **FAIL** (rejected $H_0$)
+
+Score: 0/2
+
+
+*Assessing Normality*
+
+Our histogram of $e_i$ confirms our initial scatterplot that our data is not normal but right-skewed. Our QQPlot has most of the points very close to the QQ line but deviates towards the higher square footage. Based on the QQPlot, there is at least one significant outlier. Though it would be nice to remove the higher X datapoints, they may provide additional information (so these will not be removed). Our Shapiro-Wilks Test has rejected the null hypothesis for all $\alpha = 0.10, 0.05, 0.1$, which means that our data is non-normal -- though our sample number is relatively high (n = 500), in which case the test may be conservative. Let's proceed to remove the outlier to see if the fit of our data to the model improves.
+
+* Histogram of $e_i$: **FAIL**
+
+* QQPlot: **SEMI-PASS**
+
+* SW Test: **FAIL** (rejected $H_0$)
+
+Score: 0.5/3
+
+
+# IIIb. Diagnostics - data with outliers removed
+#### REMOVING OUTLIERS
+```{r, echo=FALSE}
+###### IIIb.Diagnostics - data with outliers removed
+#Removing Outliers
+cutoff = 2.0 *10^6
+outliers1 = which(k$price > cutoff | k$price < -cutoff)
+k2 = k[-outliers1,]
+```
+Since we know that We are defining outliers to be datapoint with an $e_i$ above $`r cutoff`$.
+```{r, echo=FALSE}
+#simple linear model - 2nd iteration (k2)
+k_model = lm(price ~ sqft_living, data=k2)
+#initialize for diagnostics
+k2.sum = summary(k_model)
+k2.HT = k2.sum$coefficients
+k2.HT
+k2.b1 = round(k2.HT[2,1], 2)
+k2.b0 = round(k2.HT[1,1], 2)
+k2.sb1 = round(k2.HT[2,2], 2)
+k2.b1.t = round(k2.HT[2,3]/2, 2) #divide by 2 for one-tail test
+k2.b1.p = k2.HT[2,4]
+k2$ei = k_model$residuals
+k2$yhat = k_model$fitted.values
+#quick check to see if there a significant linear relationship for b1
+#confidence intervals
+k2.CI = confint(k_model, level = 0.99)
+k2.CI.b1 = k2.CI[2,]
+```
+
+Removing the outlier, our new estimated regression line:
+
+$Y = 71,582.79 + `r k2.b1`X$
+
+We are 99% confident that that when our square footage (X) changes by 1 unit, the estimated change of housing prices (Y) increases between `r k2.CI.b1[1]` and `r k2.CI.b1[2]`, on average. Since zero is not included in the confidence interval of $b_1$ and is strictly positive, a statistically significant positive relationship is suggested between X and Y. 
+
+Note that our slope ($b_1$) has decreased now that the outlier has been removed.
+
+Since there is still a statistically significant positive relationship suggested, let's continue to re-examine our data to see if it violates any of the following assumptions:
+
+* Homoscedasticity (constant variance)
+
+* Normality
+
+
+### ASSESSING HOMOSCEDASTICITY 
+
+#### I. Distribution of Errors
+
+```{r, echo=FALSE}
+##ASSESSING HOMOSCEDASTICITY 
+#i. distribution of errors
+ggplot(k2, 
+       aes(x = yhat, y = ei)) +
+  geom_smooth(method='lm', se = FALSE, color = "green", size = 0.4) +
+  geom_point(size=1, shape=18) +
+  ggtitle("Errors vs. Fitted Values") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  ylab("Errors") +
+  xlab("Fitted Values")
+```
+
+#### II. Fligner Killeen (FK) test
+
+$H_0: \sigma_l ^2 = \sigma_u ^2$
+
+$H_0: \sigma_l ^2 \neq \sigma_u ^2$
+
+```{r, echo=FALSE}
+#ii.fligner killeen test
+Group = rep("Lower",nrow(k2))
+Group[k2$price > median(k2$price)] = "Upper"
+Group = as.factor(Group)
+k2$Group = Group
+k2.FKtest = fligner.test(k2$ei, k2$Group)
+k2.FKtest
+```
+
+
+### ASSESSING NORMALITY
+
+#### I. Histogram of $e_i$
+```{r, echo=FALSE}
+##ASSESSSING NORMALITY
+#i.histogram of ei
+ggplot(k2,
+       aes(x = ei)) + 
+  geom_histogram(binwidth = 50000, color = "black",fill = "white") + 
+  xlab("ei") + 
+  ggtitle("Residuals") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+#### II. QQ Plot
+```{r, echo=FALSE}
+#ii. qqplot
+qqnorm(k_model$residuals)
+qqline(k_model$residuals)
+```
+
+#### III. Shapiro-Wilks Test
+
+$H_0:$ The errors are normally distributed
+
+$H_A:$ The errors are NOT normally distributed
+```{r, echo=FALSE}
+#iii. shapiro-wilks test
+k2.ei = k_model$residuals
+k2.SWtest = shapiro.test(k2.ei)
+k2.SWtest
+
+```
+
+
+
+###DISCUSSION - Diagnostics (OUTLIER REMOVED)
+
+*Assessing Homoscedasticity*
+
+With our outlier removed, the scatterplot of errors versus fitted values has improved, though there is still a distinct sergregious violation of constant variance (cone shaped). Our Fligner-Killeen test still rejects  null hypothesis for all $\alpha = 0.10, 0.05, 0.1 $.
+
+* Errors vs. Fitted Values: **FAIL**
+
+* FK Test: **FAIL** (rejected $H_0$)
+
+Score: 0/2
+
+
+*Assessing Normality*
+
+Our histogram of $e_i$ improved but still shows evidence of right-skewness. Our QQPlot has most of the points very close to the QQ line with no more outliers, so we will subjectively give this a pass (with much reservation). Our Shapiro-Wilks Test has rejected the null hypothesis again for all $\alpha = 0.10, 0.05, 0.1$.
+
+* histogram of $e_i$: **FAIL**
+
+* QQPlot: **PASS**
+
+* SW: **FAIL** (rejected $H_0$)
+
+Score: 1/3
+
+
+
+# IV. Analysis
+
+####Overview 
+
+* Model Fit
+
+* Significant Linear Relationship
+
+* Diagnostics
+
+####I. Model Fit 
+
+```{r, echo=FALSE}
+##### IV. Analysis
+#i.Model Fit
+k_table = anova(k_model)
+k_table
+SSE = k_table[2,2]
+SSR = k_table[1,2]
+SSTO = SSE + SSR
+R2 = round(SSR/SSTO * 100, 2)
+```
+
+Our cooefficient of determination $R^2$ is $`r R2`$%. 
+
+Thus, $`r R2`$% of the variance in housing prices (Y) is explained by the linear relationship with square footage (X).
+
+
+####II. Significant linear Relationship 
+
+**Estimated Regression Line**
+
+Our estimated regression line is:
+  
+$Y = 71,582.79 + `r k2.b1`X$
+
+**Hypothesis Testing of $b_1$**
+
+Our null hypothesis states ($H_0$) that there is no negative linear relationship between housing prices (Y) and square footage(X), which is equivalent to $H_0 \leq 0$.  
+
+Our alternative hypothesis states ($H_A$) that there is a significant positive relationship between housing prices (Y) and square footage (X), which is equivalent to $H_A > 0$.
+
+The t-statistics of b1 is $`r k2.b1.t`$, which can be interpreted as our sample slope ($b_1$ = $`r k2.b1`$) is $`r k2.b1.t`$ estimated standard errors away from the hypothesized slope of zero. Our p-value is $`r k2.b1.p`$ which is less than all $\alpha = 0.10, 0.05, 0.01$. Thus, we reject the null hypothesis.
+
+Our conclusion, therefore, is that if there was no relationship or negative linear relationship between housing prices (Y) and square footage (Y), we find that our test-statistic ($`r k2.b1.t`$) or more extreme with the probability of of $`r k2.b1.p`$.
+
+Thus, we reject the null hypothesis and accept the alternative hypothesis that there is a significant positive linear relationship.
+
+
+**Confidence interval of $b_1$**
+
+Our confidence interval for $b_1$:
+```{r,echo=FALSE}
+#confidence interval for b1
+k2.CI.b1
+
+```
+
+We are 99% confident that when square footage(X) increases by 1 unit, housing prices (Y) increases between 193.9853 and 249.2130, on average. Since our confidence interval does not contain zero and is strictly positive, it suggests a statistically significant positive linear relationship, on average.
+
+
+####III. Diagnostics
+
+For detailed analysis and interpretation, please see the Diagnostics section above. That section discusses each test and the ultimate decision to remove an outlier to form our new estimated regression line.
+
+A summary is provided below:
+
+*Assessing Homoscedasticity*
+
+
+* Scatterplot of Errors vs. Fitted Values: **FAIL**
+
+* FK Test: **FAIL** (rejected $H_0$)
+
+Score: 0/2
+
+
+*Assessing Normality*
+
+* histogram of $e_i$: **FAIL**
+
+* QQPlot: **PASS**
+
+* SW: **FAIL** (rejected $H_0$)
+
+Score: 1/3
+
+
+# V. Interpretation
+```{r, echo=FALSE}
+#V. Interpretation
+#No code was used in interpretation
+
+```
+
+Our sample data (n = 500) of the houses in King County, Washington suggests that there is a statistically significant positive linear relationship between housing prices(Y) and square footage. Furthermore, we are 99% confident that when square footage(X) increases by 1 unit, housing prices (Y) increases between 193.9853 and 249.2130, on average.
+
+However, based on the diagnostic tests assessing homoscedasticity and normality, our simple linear regression model has commited ergregious violations of our underlying assumptions. 
+
+The author of this paper highly recommends caution when using this model with the intent of accurately predicting housing prices based on square footage.
+
+# VI. Prediction Results
+
+As stated in the Interpretation section, the author of this paper highly recommends caution when using this model with the intent of accurately predicting housing prices based on square footage. However, we will proceed to make the following prediction anyways...
+
+We will restate the estimated regression line here for reference:
+
+$Y = 71,582.79 + `r k2.b1`X$
+
+
+
+```{r, echo=FALSE}
+##### VI. Prediction Results - Initialize
+xs.1 = data.frame(sqft_living = 2800)
+xs.2 = data.frame(sqft_living = 3200)
+xs.3 = data.frame(sqft_living = 8000)
+```
+
+
+#### Task 1 by client: Predict the average house price for houses with living square footage 2800. 
+```{r, echo=FALSE}
+#Task 1 by client
+ys.1.CI = predict(k_model, xs.1, interval = "confidence", level = 0.99)
+```
+Our predicted average house price for houses with living square footage 2800 is \$692,060.40
+
+We are 99% confident that, on average, houses with a living square footage of 2800 will sell in between the interval of  \$660,476.80 and  \$723,644.00
+
+#### Task 2 by client: Predict the price of a particular house with living square footage 3200.
+```{r, echo=FALSE}
+#Task 2 by client
+ys.2.PI = predict(k_model, xs.2, interval = "prediction", level = 0.99)
+```
+Our predicted average house price for a single house with living square footage 3200 is \$780,700.10
+
+We are 99% confident that, on average, a house with a living square footage of 3200 will sell in between the interval of \$238,685.50 and \$1,322,715.00
+
+
+#### Task 3 by client: Predict the average house price for houses with living square footage 8000.
+```{r, echo=FALSE}
+#Task 3 by client
+ys.3.CI = predict(k_model, xs.3, interval = "confidence", level = 0.99)
+
+```
+Our predicted average house price for houses with living square footage 8000 is $1,844,376.00
+
+We are 99% confident that, on average, houses with a living square footage of 8000 will sell in between the interval of $1,678,864.00 and \$2,009,888.00
+
+# VII. Conclusions
+```{r, echo=FALSE}
+##### VII. Conclusions
+#No code was used in the conclusions
+
+```
+Based on our hypothesis testing and confidence interval, we see that there is a significant positive linear relationship between housing prices (Y) and square footage (X) of the homes in King County, Washington.
+
+We note from a diagostics of our model that data fails mutiple assumption tests when assessing both homoscedasiticity and normality. Removal of the outlier significant improved the quality of our dataset but failed to rectify these ergregious violations.
+
+From the original scatterplots, histograms, and boxplots, our inference that the data is right-skewed is confirmed by further assessing the QQplots, histogram of errors, and scatterplot of errors versus fitted values. This perhaps may be a suggestion that our model is more reliable under some unidentified value of square footage. 
+
+Please carefully consider these stated concerns when utilizing the predicted values of housing prices for the specified square footage.
+
+
+### R Appendix Of Code
+```{r, ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
+```

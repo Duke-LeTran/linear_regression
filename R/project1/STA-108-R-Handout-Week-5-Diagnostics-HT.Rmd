@@ -1,0 +1,209 @@
+---
+title: "STA 108 R Handout - Diagnostics and F test for SLR"
+author: "Erin K. Melcon"
+output:
+  pdf_document: default
+  html_document: default
+---
+### The data
+We will continue to use the `cats` dataset, so you'll need to load the library `MASS`:
+```{r}
+library(MASS)
+cats = cats[,-1]
+head(cats)
+```
+
+### 1. Identifying Outliers
+There are a number of ways to identify outliers, but one of them is to look at the scatter plot and find any unusual observations.  I'll use the ugly plot for plotting all values of $Y$ against all values of $X$:
+
+```{r}
+plot(cats)
+```
+
+We want to look at the plots that have $Y = $ Bwt against another variable, and see if there are any unusual observations.  There does appear to be a high heart weight value, which roughly is something above 18g.  Using this, and the subsetting from last week, we can identify the outlier "row" as:
+
+```{r}
+cats[which(cats$Hwt > 18),]
+```
+
+The general format, once you have figured out which column you are looking at, and if the value is above or below a certain reference point is:
+
+`dataset[which(dataset$columnname > reference),]` (for high outliers)
+`dataset[which(dataset$columnname < reference),]` (for low outliers)
+
+Later, we will remove the outliers, but for now I'll use the different methods to identify them.
+
+### 2 Assessing Normality
+For the rest of the handout, it will be useful to add two columns to our dataset - one for the errors and one for the fitted values.  Once you have a model fitted (I'll assume you've called it `the.model`), the generic commands to do that are:
+
+`dataset$ei = the.model$residuals`
+`dataset$yhat = the.model$fitted.values`
+
+For example,
+
+```{r}
+the.model = lm(Bwt ~ Hwt,data = cats)
+cats$ei = the.model$residuals
+cats$yhat = the.model$fitted.values
+```
+
+There are two primary ways to assess normality.
+
+### 2.1 QQ plot
+we can easily obtain the qqplot with the following generic commands:
+
+`qqnorm(the.model$residuals)`
+`qqline(the.model$residuals)`
+
+The second line adds the reference point of $y=x$.  For example, our QQ plot of our data is:
+```{r}
+qqnorm(the.model$residuals)
+qqline(the.model$residuals)
+```
+
+This plot has most of the points very close to the line, with one or two possible outliers.  For example, I can look at the y axis and try and eyeball what value is an outlier, then use subsetting to display that row.  I think anything larger than 0.70 is an outlier, so to subset that I can do:
+
+```{r}
+cats[which(cats$ei > 0.7),]
+```
+
+### 2.2 Testing Normality (Shapiro-Wilks).
+To formally test $H_0$: The errors are normally distributed vs. $H_A$: The errors are not normally distributed, we can use the function `shapiro.test`.  Assuming you've saved your linear model, we can easily get the p-value back for the test:
+```{r}
+ei = the.model$residuals
+the.SWtest = shapiro.test(ei)
+the.SWtest
+```
+I can print out all the information, but I can also just reference the p-value if I have saved the information (as I did above).  The p-value for our test was :` `r the.SWtest$p.value`
+
+Since our p-value was relatively large, we fail to reject the null, and support that our data is normally distributed at any reasonable significance level (1%, 5%, 10%). 
+
+### 3 Assessing constant variance (homoscedasticity)
+Again, there are two main ways of assessing homoscedasticity.
+
+### 3.1 Plotting errors vs. fitted values
+A simple plot can reveal large patterns.  The generic commands are:
+
+`plot(the.model$fitted.values, the.model$residuals, main = "Errors vs. Fitted Values",xlab = "Fitted Values",ylab = "Errors")`
+`abline(h = 0,col = "purple")`
+
+The second line adds a purple line at $ei=0$. 
+
+To use ggplot2 nicely, I'm assuming you've added the columns with the errors and fitted values. Then, the generic command is:
+
+`qplot(yhat, ei, data = dataset) +  ggtitle("Errors vs. Fitted Values") + xlab("Fitted Values") + ylab("Errors") + geom_hline(yintercept = 0,col = "purple")`
+
+For example, in our `cats` dataset:
+
+```{r} 
+library(ggplot2)
+qplot(yhat, ei, data = cats) +  ggtitle("Errors vs. Fitted Values") + xlab("Fitted Values") + 
+  ylab("Errors") + geom_hline(yintercept = 0,col = "purple")
+```
+
+Again, we see some possible outliers, and again I can find them using either values of `ei`, or `yhat`:
+
+```{r}
+cats[which(cats$yhat > 4),]
+```
+
+### 3.2 Fligner Killeen test (FK test).
+**Note:  The FK test is an alternative to the Brown Forsythe test.  The mechanics are the same**.
+
+For this test, we have to create a vector for grouping the data, where group 1 is anything less than or equal to the median of the response variable (or fitted values), and group 2 is anything above the response variable. 
+
+The generic commands to do this, and then add the column to the dataset are:
+
+`Group = rep("Lower",nrow(dataset))` #Creates a vector that repeats "Lower" n times
+`Group[dataset$Ycolumn > median(dataset$Ycolumn)] = "Upper"` #Changing the appropriate values to "Upper"
+`Group = as.factor(Group)` #Changes it to a factor, which R recognizes as a grouping variable.
+`dataset$Group = Group`
+
+Now, we can use the function `fligner.test` to find the p-value for $H_0$:  There are equal variances for the upper and lower groups vs. $H_A$: There are unequal variance between the upper and lower groups.  The generic commands to do this are:
+
+`fligner.test(dataset$ei, dataset$Group)`
+
+For example, in our cats dataset we could do:
+
+```{r}
+Group = rep("Lower",nrow(cats)) #Creates a vector that repeats "Lower" n times
+Group[cats$Bwt > median(cats$Bwt)] = "Upper" #Changing the appropriate values to "Upper"
+Group = as.factor(Group) #Changes it to a factor, which R recognizes as a grouping variable.
+cats$Group = Group
+the.FKtest= fligner.test(cats$ei, cats$Group)
+the.FKtest
+```
+Then, we can find the p-value is: `r the.FKtest$p.value`.  This is still larger than any typical alpha, so we would support that the lower variance is equal to the upper variance.
+
+
+### 4 Removing outliers from a dataset
+Want we need in order to remove outliers is **the row number the outlier was in**.  Fortunately, this is what most of my code does - finds the row number of a suspect outlier.
+
+Then, once you have the row number (or a list of row numbers), call it `outliers`, we can remove them by the following:
+
+`new.data = dataset[-outliers,]`
+
+For example, lets say I use the values of $X$ to find outliers.  Then, I can save those that are outliers as follows:
+
+```{r}
+cutoff = 3.8 # you have to modify this value
+outliers = which(cats$Bwt > cutoff |  cats$Bwt < -cutoff)
+new.data = cats[-outliers,]
+```
+
+Now, I may want to refit my regression model in order to remove the influence of the outliers.  The only thing that would change is you would use `new.data` rather than `dataset`.
+
+```{r}
+new.model = lm(Bwt ~ Hwt,data = new.data)
+```
+
+### 5 Testing a large and small model
+
+When we have a "larger model" vs a "smaller model", we either want to fit two ANOVA tables, or there is a function that will allow us to compare the models directly.  You'll want to fit two models, one with less $X$ variables in it, and one that has more.  
+
+For example, consider the `cats` data.  The "smaller" model in this case is just the model with the intercept.
+
+Fitting the two models with their ANOVA tables give:
+
+```{r}
+smaller.model = lm(Bwt ~ 1, data = cats)
+anova.small = anova(smaller.model)
+larger.model = lm(Bwt ~ Hwt, data = cats)
+anova.large = anova(larger.model)
+```
+
+Now, the generic command to test $H_0$:  The smaller model fits better (i.e $\beta_1 = 0$ in our example), vs. $H_A$:  The larger model fits better (at least one $\beta_1 \neq 0$ in our example) is:
+
+`anova(smaller.model,larger.model)`
+
+This gives the separate values of SSE, the test-statistic, and the p-value:
+
+```{r}
+anova(smaller.model,larger.model)
+```
+The first row gives the degrees of freedom for SSE for the smaller model, and the SSE for the smaller model.  The next gives the degrees of freedom for SSE for the larger model, the SSE for the larger model, the difference in the SSE's, the value of the F statistic, and the corresponding p-value.
+
+### 6. Plotting several plots in one plotting window
+
+We often want to plot 4 specific plots for diagnostics:
+1. A scatterplot
+2. A QQ plot
+3. A histogram of the errors
+4. X vs. ei.
+
+If we want them all on one plot, we can use the following (note, I'm renaming my columns of my dataset to make it a bit easier):
+```{r}
+names(cats)
+names(cats)[1:2] = c("Y","X")#Renames the first two columnns
+the.model = lm(Y ~ X, data = cats)
+par(mfrow=  c(2,2)) #Makes a 2 x 2 grid which plots will fill in to
+plot(cats$X, cats$Y, main = "Scatterplot",pch = 19,font = 2,font.lab = 2,cex = 1.25, ylab = "Y variable",xlab = "X variable")
+qqnorm(the.model$residuals,pch = 19,font = 2,font.lab = 2,cex = 1.25)
+qqline(the.model$residuals,lwd = 2, col = "purple")
+hist(the.model$residuals, main = "Residuals", xlab = "ei",pch = 19,font = 2,font.lab = 2,cex = 1.25)
+plot(the.model$residuals, cats$X, main = "Scatterplot",pch = 19,font = 2,font.lab = 2,cex = 1.25, ylab = "ei values",xlab = "X variable")
+abline(h = 0, lwd = 2, col = "purple")
+```
+
+You would want to give the plots titles and appropriate axis labels.  
+

@@ -1,0 +1,250 @@
+---
+title: "STA 108 - Model Selection Handout II"
+author: "Erin K. Melcon"
+output: html_document
+---
+Note, this handout requires installation of the packages `leaps` and `MPV`.  You can install them with the commands `install.packages("leaps")` and `install.packages("MPV")`.
+
+We will be using the built-in dataset `state.x77`.  To see more about this dataset, you may type `?state.x77`.  
+
+First I will rename things, because I don't like the names they default to:
+
+```{r}
+new.state = data.frame(pop = state.x77[,1], income = state.x77[,2], ill = state.x77[,3], life.exp =  state.x77[,4], murder = state.x77[,5], hs.grad = state.x77[,6], frost.days = state.x77[,7], land.area = state.x77[,8])
+```
+
+A quick summary of the data is:
+```{r}
+summary(new.state)
+```
+
+Next, just to save on space, I will rename the column to be $Y$, $X_1$, $X_2$, etc.  Then, I'll fit the full model.
+```{r}
+names(new.state) = c("X1","X2","X3","Y","X4","X5","X6","X7" )
+full.model = lm(Y~ X1 + X2 + X3 + X4 + X5 + X6 + X7,data = new.state)
+```
+
+### 1.  All subsets regression
+For reasonably small number of predictors, we can use a function in R that calculates all possible models, and the corresponding AIC, BIC, or CPMallows for each. 
+
+First, you have to install the package `leaps`.  Then, load the library `leaps`.  The function we will use is called: `regsubsets`.  The general format is to give `regsubsets` the same information as `lm`, and by default the full model:
+
+`regsubsets(Y ~ X1 + X2  + X3 ..., data = dataset)`  
+or  
+`regsubsets(Y ~ ., data = dataset)`  
+
+For example,
+```{r}
+library(leaps)
+all.models = regsubsets(Y ~., data = new.state)
+```
+
+The output of this is pretty dreadful, but it gives back the top two models of each size (two models that have just 1 X, two models that have 2 X's, etc.).  To summarize the CPmallows, AIC, and BIC for these models we can use the following command that I have created:
+
+```{r}
+some.stuff = summary(all.models)
+names.of.data = c("Y",colnames(some.stuff$which)[-1])
+n= nrow(new.state) #Will have to change the name
+K = nrow(some.stuff$which)
+nicer = lapply(1:K,function(i){
+  model = paste(names.of.data[some.stuff$which[i,]],collapse = ",")
+  p = sum(some.stuff$which[i,])
+  BIC = some.stuff$bic[i]
+  CP = some.stuff$cp[i]
+  results = data.frame(model,p,CP,BIC)
+  return(results)
+})
+nicer = Reduce(rbind,nicer)
+nicer
+```
+*** You would potentially have to change `all.models`, `names.of.data`, `new.state`.***
+
+A small note:  BIC shown here is a slightly different formula than we use, but we would still pick the lowest (most negative) BIC as the "best" model.  Thus, the model with the most negative BIC is Y,X1,X4,X5,X6.
+
+By CP mallow however, we want the model where CP $\approx$ P (disregarding the largest model where this is ALWAYS true), this is the model Y,X4,X5,X6.  In this case, Mallows CP actually chose a smaller model than even BIC.
+
+### 2. Stepwise Regression
+On Monday, May 1st we will go over stepwise regression.  But, in preparation here is the code to do forward stepwise, backward stepwise, forward-backward, or backward-forward in R.
+
+All of the functions will require that we fit two models - the full (or largest) model, and the empty model (with no X variables).  To do that, we can use the the following:
+
+`full.model = lm(Y ~ X1+X2+X3+X4 ..., data =dataset)` (Adding as many X's as you have)  
+
+`empty.model = lm(Y ~ 1, data =dataset)`
+
+For example,
+
+```{r}
+full.model = lm(Y ~ X1 + X2 + X3 + X4 + X5 + X6 + X7, data = new.state)
+empty.model = lm(Y ~ 1,data = new.state)
+```
+
+### 2.1 Forward step-wise regression
+**First, again this function uses a slightly different formula for AIC, but we still would like the smallest AIC (or most negative).**
+
+For foward step-wise regression, we start with the empty model, and add one X at a time.  To code this in R, it is:
+
+```{r}
+n = nrow(new.state)
+library(MASS)
+forward.model.AIC = stepAIC(empty.model, scope = list(lower = empty.model, upper= full.model), k = 2,direction = "forward")
+forward.model.BIC = stepAIC(empty.model,  scope = list(lower = empty.model, upper= full.model), k = log(n),direction = "forward")
+```
+
+The `scope` gives what the largest and smallest model it should consider is, and `k` correspds to 2 if we want AIC, and log(n) if we want BIC.   `direction` can be "forward","backward", or "both".
+
+Now, if we don't want R to print out every step (which usually we do not), we can add `trace = FALSE` to our commands:
+
+```{r}
+forward.model.AIC = stepAIC(empty.model, scope = list(lower = empty.model, upper= full.model), k = 2,direction = "forward",trace = FALSE)
+forward.model.BIC = stepAIC(empty.model,  scope = list(lower = empty.model, upper= full.model), k = log(n),trace=FALSE,direction = "forward")
+```
+
+What is returned is your model formula, so we could for example see the estimated coefficients by 
+```{r}
+forward.model.AIC$coefficients
+```
+
+### 2.2 Backward step-wise selection
+All we would change is what model we give it first, and what direction we are going in.
+
+```{r}
+backward.model.AIC = stepAIC(full.model, scope = list(lower = empty.model, upper= full.model), k = 2,direction = "backward",trace = FALSE)
+backward.model.BIC = stepAIC(full.model,  scope = list(lower = empty.model, upper= full.model), k = log(n),trace=FALSE,direction = "backward")
+```
+
+### 2.3 Forward-Backward or Backward-Forward step-wise selection 
+Now we change what model we give it first, and what direction.  For FB = forward-backward:
+
+```{r}
+FB.model.AIC = stepAIC(empty.model, scope = list(lower = empty.model, upper= full.model), k = 2,direction = "both",trace = FALSE)
+FB.model.BIC = stepAIC(empty.model,  scope = list(lower = empty.model, upper= full.model), k = log(n),trace=FALSE,direction = "both")
+```
+
+
+For BF = backward-forward:
+```{r}
+BF.model.AIC = stepAIC(full.model, scope = list(lower = empty.model, upper= full.model), k = 2,direction = "both",trace = FALSE)
+BF.model.BIC = stepAIC(full.model,  scope = list(lower = empty.model, upper= full.model), k = log(n),trace=FALSE,direction = "both")
+```
+
+### Final Models
+Now we can look at all the AIC models:
+
+```{r}
+forward.model.AIC$coefficients
+backward.model.AIC$coefficients
+FB.model.AIC$coefficients
+BF.model.AIC$coefficients
+```
+
+Or the BIC models:
+```{r}
+forward.model.BIC$coefficients
+backward.model.BIC$coefficients
+FB.model.BIC$coefficients
+BF.model.BIC$coefficients
+```
+
+We have some agreement here, which is always nice.  
+
+### 3. Outliers/Leverage Points
+We will consider the backward-forward model to be the "best" model, and I will name it such (this choice is of course arbitrary, and depends on your goal):
+```{r}
+best.model= BF.model.BIC
+```
+
+### 3.1 Outliers
+
+### 3.1.1 Semi-studentized/standardized residuals
+The code to calculate $e_{i}^\ast$ follows:
+```{r}
+ei.s = best.model$residuals/sqrt(sum(best.model$residuals^2)/(nrow(new.state) - length(best.model$coefficients)))
+```
+Note that this is just calculating $e_i/sqrt(MSE)$, where $SSE$ = `(sum(best.model$residuals)^2`, $n =$ `nrow(new.state)`, and $p$ = `length(best.model$coefficients)`.
+
+### 3.1.2 Studentized/Standardized residuals
+For these values of $r_i$, there is a function we can use in R called `rstandard`:
+```{r}
+ri = rstandard(best.model)
+```
+
+### 3.1.3 Deleted Residuals
+The values of residuals which delete one observation, and then calcualte the residuals for the deleted values, i.e. $t_i$ are found using `rstudent`:
+```{r}
+ti = rstudent(best.model)
+```
+
+### 3.1.4 Identifying Outliers
+For all three of these, we are usually interested in if the absolute value is larger than a percentile of the t-distribtion (larger percentiles mean that we would only consider high outliers). 
+
+To calculate the cutoff value based on a t-distribution, we can use the code:
+```{r}
+alpha = 0.1 ; n = nrow(new.state); p = length(best.model$coefficients)
+cutoff = qt(1-alpha/(2*n), n -p )
+cutoff.deleted = qt(1-alpha/(2*n), n -p -1 )
+
+outliers = which(abs(ei.s)> cutoff | abs(ri) > cutoff | abs(ti) > cutoff.deleted)
+```
+Note, the above code asks "Which |$e_i^\ast$| is larger than the cutoff, OR which |$r_i$| is larger than the cutoff, OR which $|t_i$| is larger than the cutoff".  In other words, it is checking all of the residuals at once.
+
+You can use a specific type of residual by adjusting the code, and removing the portion you are uninterested in.
+
+For this dataset, these rows were outliers:
+```{r}
+new.state[outliers,]
+```
+
+In other words, there were no outliers. 
+
+### 3.2 Leverage Values
+Leverage values are values that highly influence the regression line, but are not necessarily outliers.  
+
+There is one function that will give us all of our influence measures - `influence.measures`:
+
+```{r}
+all.values = influence.measures(best.model)$infmat
+colnames(all.values)
+```
+Note:  This function saves the values as a matrix, not a dataframe, so we have to modify how we select columns (see below). 
+
+All of the columns which start with `dfb` give the values of DFBETA for the specific X variable.
+
+The column called `hat` gives the values of $h_{ii}$, the diagonal of the hat matrix.
+
+The column `cook.d` gives the values of cooks distance.
+
+The column `dffit` gives the values of DF (the difference in fitted values).
+
+A note, the last column attempts to guess if the row of the data is a leverage point, but how it does so is unclear.  If the funciton believes that the row is a leverage point, there is an asterik.  If not, there is no asterik.
+
+Then, you would choose the appropriate cutoff for the particular way to measure leverage, you could use
+
+```{r}
+lev.hat = which(all.values[,"hat"] >2*p/n)
+new.state[lev.hat,]
+```
+
+According to the above cutoff, there are 5 leverage points.
+
+Using DF, lets see if any are above 1:
+
+```{r}
+lev.DF = which(all.values[,"dffit"] >1)
+new.state[lev.DF,]
+```
+Hawaii is considered a leverage point with this criteria. 
+
+Using Cooks-Distance,
+```{r}
+lev.DF = which(all.values[,"cook.d"] >qf(0.50,p,n-p))
+new.state[lev.DF,]
+```
+None are considered leverage points by this criteria. 
+
+You can do the same thing for DF beta, but it is sepcific to what X you are interested in.
+
+
+### 4. Shapiro-Wilks and Fligneer-Killen / Brown-Forsythe
+
+For these functions, please refer back to our old diagnostic handout.  Nothing has changed, except we typically split the group on $Y$ or the fitted values $\hat{Y}_i$ instead of an $X$. 
