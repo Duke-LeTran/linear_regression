@@ -7,7 +7,7 @@ output: rmarkdown::github_document
 
 ```{r, echo = FALSE}
 # Initialize - Read, Library
-k <- read.csv("C:/Users/dletran/Dropbox/Documents/108 - STA, linear regression/Projects/project1/KingCounty.csv") 
+k <- read.csv("C:/Users/dukeletran/Documents/108 - STA, linear regression/Projects/project1/KingCounty.csv") 
 library(ggplot2)
 library(gridExtra)
 

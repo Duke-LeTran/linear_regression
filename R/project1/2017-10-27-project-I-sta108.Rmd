@@ -2,12 +2,13 @@
 title: "Statistical Analysis of Housing Prices and Square Footage in King county, Washington"
 author: "Duke LeTran"
 date: "October 27th, 2017"
-output: html_document
+output: rmarkdown::github_document
 ---
 
 ```{r, echo = FALSE}
 # Initialize - Read, Library
-k <- read.csv("C:/Users/dletran/Dropbox/Documents/108 - STA, linear regression/Projects/project1/KingCounty.csv") 
+#k <- read.csv("C:/Users/dletran/Dropbox/Documents/108 - STA, linear regression/Projects/project1/KingCounty.csv") 
+k <- read.csv("/Users/dukeletran/Documents/Projects/linear-regression/R/project1/KingCounty.csv") 
 library(ggplot2)
 library(gridExtra)
 
